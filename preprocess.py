@@ -15,7 +15,7 @@ def checkNotAllGroup(d, keys, v, parseFunc=str): return sum([1 if checkNot(d, ke
 
 def check(d, k, v, parseFunc=str): return d[k].strip() and parseFunc(d[k].strip()) == v
 
-datapath = '/Users/ykamoji/Documents/Semester1/STAT_501/Project/Airlines_Delay_Stat_Analysis/Uncompressed/'
+datapath = '/Users/ykamoji/Documents/Semester1/STAT_501/Project/Airlines_data/Uncompressed/'
 
 airlines_to_filter=dict()
 origins_to_filter=dict()
