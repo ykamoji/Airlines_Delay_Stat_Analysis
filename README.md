@@ -5,20 +5,14 @@ About Dataset
 
 Source: https://www.transtats.bts.gov/OT_Delay/OT_DelayCause1.asp
 
-Flight delay data collected for the latest 6 months on below airlines and airports:
+Flight delay data collected for the latest 6 months on below airlines:
 
 1. Airlines:
    1. American Airlines Inc. (AA)
    2. Delta Air Lines Inc. (UA )
    3. Delta Air Lines Inc. (DL)
-   4. Envoy Air (MQ)
+   4. Skywest Airlines Inc. (OO)
 
-
-2. Airports:
-   1. Boston, MA: Logan International (BOS)
-   2. New York, NY: John F. Kennedy International (JFK)
-   3. Washington, DC: Ronald Reagan Washington National (DCA)
-   4. Los Angeles, CA: Los Angeles International (LAX)
 
 A flight is considered delayed when it arrived 15 or more minutes than the schedule. 
 Delayed minutes are calculated for delayed flights only. (Updated) Early arrivals and departures 
