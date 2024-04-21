@@ -6,6 +6,8 @@ library(modeest)
 library(rcompanion)
 library(ggplot2)
 library(moments)
+library(ggpubr)
+library(nhstplot)
 ```
 
 ```{r}
@@ -22,72 +24,85 @@ printSummary <- function(data, withDetails=TRUE){
 
 }
 
-# 
-# showStats <- function(data1, data2, label1, label2, histbreaks, column){
-#   
-#   printSummary(data1)
-#   hist(data1, prob = TRUE, breaks = histbreaks, main=label1, xlab = NULL)
-#   lines(density(data1), col = 4, lwd = 2)
-#   
-#   suppressWarnings({
-#     xqqmath(data1)
-#   })
-#   
-#   printSummary(data2)
-#   hist(data2, prob = TRUE, breaks = histbreaks, main=label2, xlab = NULL)
-#   lines(density(data2), col = 4, lwd = 2)
-#   
-#   suppressWarnings({
-#     xqqmath(data2)
-#   })
-#   
-#   
-#   WD_len = length(data1)
-#   
-#   WD_week <- 1:WD_len
-#   
-#   WD_label <- c(rep("Weekday", WD_len))
-#   
-#   WE_len = length(data2)
-#   
-#   WE_week = 1:WE_len
-#   
-#   WE_label <- c(rep("Weekend", WE_len))
-#   
-#   WD_plot_data <- data.frame(WD_week,WD_label, data1)
-#   
-#   WE_plot_data <- data.frame(WE_week,WE_label, data2)
-#   
-#   cols <- c('week','day',column)
-#   
-#   colnames(WD_plot_data) <- cols
-#   
-#   colnames(WE_plot_data) <- cols
-#   
-#   plot_data <- merge(WD_plot_data, WE_plot_data, by = cols, all = TRUE)
-#   
-#   return(plot_data)
-# }
+```
+
+
+```{r}
+dataset <- read.table('/Users/ykamoji/Documents/Semester1/STAT_501/Project/Airlines_data/Uncompressed/airlines_delay_data.csv',header=TRUE, sep=',')
+```
+
+```{r}
+
+c <- 1:1
+
+par(mfrow = c(5,4), mar=c(2,2,1,1))
+
+carriers <- c("AA","UA","DL","OO")
+
+ all_airports = dataset %>%
+    group_by(DEST) %>%
+    summarise(count = sum(ARR_DEL15), .groups = 'drop')
+
+for(i in c){
+  
+  random_airports = all_airports$DEST[sample(1:length(all_airports$DEST), 150)]
+  
+  airports <- random_airports
+  
+  dataset_filtered <- dataset %>%
+    filter(!is.na(dataset$ARR_DEL15) & !is.na(dataset$DEP_DEL15) & dataset$OP_UNIQUE_CARRIER %in% carriers
+           & dataset$ORIGIN %in% airports & dataset$DEST %in% airports)
+  
+  dataset_filtered[is.na(dataset_filtered)] <- 0
+  
+  dataset_filtered <- dataset_filtered %>% mutate(TOTAL_DELAY = CARRIER_DELAY + WEATHER_DELAY + NAS_DELAY + SECURITY_DELAY + LATE_AIRCRAFT_DELAY)
+  
+  weekends_index = list(6, 7)
+  
+  dataset_filtered <- dataset_filtered %>% mutate(DAY = ifelse(DAY_OF_WEEK %in% weekends_index,"Weekend", "Weekday"))
+  
+  result <- dataset_filtered  %>%
+    group_by(DAY_OF_WEEK, FL_DATE, ARR_DEL15) %>%
+    summarise(count = count(ARR_DEL15), month = as.numeric(strsplit(FL_DATE, split = "/")[[1]][1]), date = as.numeric(strsplit(FL_DATE, split = "/")[[1]][2]), day = unique(DAY),.groups = 'drop')
+  
+  sorted_result <- result[order(result$month,result$date),]
+  
+  transformed <- sorted_result[c(1,5,6,3,7,4)]
+  
+  len <- dim(transformed)[1]
+  
+  delay_outliers <- transformed %>% 
+    filter(transformed$ARR_DEL15 == 1) %>%
+    reframe(count)
+  
+  delay_outliers <- as.numeric(unlist(delay_outliers))
+  
+  delay_outlier_upper_bound = mean(delay_outliers) + 3 * sd(delay_outliers)
+  delay_outlier_lower_bound = mean(delay_outliers) - 3 * sd(delay_outliers)
+  
+  delay_per_day <- transformed %>%
+    filter(transformed$ARR_DEL15 == 1 & transformed$count < delay_outlier_upper_bound & transformed$count > delay_outlier_lower_bound ) %>%
+    reframe(count)
+  
+  delay_per_day <- as.numeric(unlist(delay_per_day))
+  
+  # hist(delay_per_day, prob = TRUE, main='', xlab = '', ylab = '')
+  plot(density(delay_per_day), main='', xlab = '', ylab = '', frame.plot = FALSE, yaxt='n')
+  
+  # cat(airports,"\n")
+  # cat(skewness(delay_per_day)," ",kurtosis(delay_per_day),"\n\n")
+  
+
+  # lines(density(delay_per_day), col = 4, lwd = 2)
+
+}
 
 ```
 
 
 ```{r}
-dataset <- read.table('/Users/ykamoji/Documents/Semester1/STAT_501/Project/Airlines_Delay_Stat_Analysis/Uncompressed/airlines_delay_data.csv',header=TRUE, sep=',')
-```
 
-```{r}
-all_airports = dataset %>%
-  group_by(DEST) %>%
-  summarise(count = sum(ARR_DEL15), .groups = 'drop')
-
-random_airports = all_airports$DEST[sample(1:length(all_airports$DEST), 150)]
-```
-
-
-```{r}
-
-# airports <- random_airports
+summary(dataset)
 
 carriers <- c("AA","UA","DL","OO")
 
@@ -149,8 +164,8 @@ delay_per_day <- as.numeric(unlist(delay_per_day))
 
 printSummary(delay_per_day)
 
-boxplot(delay_per_day, horizontal = TRUE)
-hist(delay_per_day, prob = TRUE, main='Number of delays per day')
+bwplot(delay_per_day, horizontal = TRUE, xlab='Delays per day')
+hist(delay_per_day, prob = TRUE, main='Number of delays per day', xlab = "")
 
 lines(density(delay_per_day), col = 4, lwd = 2)
 
@@ -158,7 +173,11 @@ suppressWarnings({
   xqqmath(delay_per_day)
 })
 
-population_mean = mean(delay_per_day)
+suppressWarnings({
+  ggqqplot(delay_per_day, color = "black",)
+})
+
+
 ```
 
 
@@ -193,15 +212,21 @@ for(i in 1:len) {
   if(row$ARR_DEL15 == 1){
 
       if(row$DAY_OF_WEEK == weekends_index[1]){
-        weekday_delay_proportion = append(weekday_delay_proportion,proportion)
-        weekday_delays = append(weekday_delays, delays)
+       
+        if(delays > 300){
+          weekday_delay_proportion = append(weekday_delay_proportion,proportion)
+          weekday_delays = append(weekday_delays, delays)
+        }
+        
         #print(paste('WD_',delays,'_',no_delays,'_',proportion,sep=''))
         delays = 0
         no_delays = 0
       }
       else if(row$DAY_OF_WEEK == weekends_index[length(weekends_index)]){
-        weekend_delay_proportion = append(weekend_delay_proportion,proportion)
-        weekend_delays = append(weekend_delays, delays)
+         if(delays < 550){
+          weekend_delay_proportion = append(weekend_delay_proportion,proportion)
+          weekend_delays = append(weekend_delays, delays)
+         }
         #print(paste('WE_',delays,'_',no_delays,'_',proportion,sep=''))
         delays = 0
         no_delays = 0
@@ -243,13 +268,14 @@ WD_label <- c(rep("Weekday", WD_len))
 
 printSummary(weekday_delays)
 
-hist(weekday_delays, prob = TRUE, breaks = 8, main="Number of delays over weekdays")
+hist(weekday_delays, prob = TRUE, breaks = 6, main="Number of delays over weekdays", xlab = "")
 lines(density(weekday_delays), col = 4, lwd = 2)
 
-suppressWarnings({
-  xqqmath(weekday_delays)
-})
+# suppressWarnings({
+#   xqqmath(weekday_delays)
+# })
 
+# boxplot(weekday_delays, horizontal = TRUE)
 
 WD_plot_data <- data.frame(WD_week,WD_label, weekday_delays)
 
@@ -260,13 +286,22 @@ WE_week = 1:WE_len
 WE_label <- c(rep("Weekend", WE_len))
 
 printSummary(weekend_delays)
-hist(weekend_delays, prob = TRUE, breaks = 10, w=1, main="Number of delays over weekends")
+
+hist(weekend_delays, prob = TRUE, breaks = 10, w=1, main="Number of delays over weekends", xlab = "")
 lines(density(weekend_delays), col = 4, lwd = 2)
 
-suppressWarnings({
-  xqqmath(weekend_delays)
-})
+# suppressWarnings({
+#   xqqmath(weekend_delays)
+# })
 
+
+# boxplot(weekend_delays, horizontal = TRUE)
+
+boxplot(list(WeekdayDelays = weekday_delays, WeekdendDelays = weekend_delays),
+main = "Delays over weekdays and weekend", 
+xlab = "Number of delays",
+col = c("orange", "lightgreen"), names = c("Weekday Delays", "Weekdend Delays"),
+    horizontal = TRUE)
 
 WE_plot_data <- data.frame(WE_week,WE_label, weekend_delays)
 
@@ -290,36 +325,34 @@ plot_data %>%
 
 ```{r}
 ## TODO: Correct the T test.
-t.test(weekend_delays, mu = population_mean)
+# t.test(weekend_delays, mu = population_mean)
 
 t.test(weekday_delays, weekend_delays)
+
+test_mean_diff = mean(weekday_delays) - mean(weekend_delays)
+
+sigma1 = sd(weekday_delays)
+n1 = length(weekday_delays)
+  
+sigma2 = sd(weekend_delays)
+n2 = length(weekend_delays)
+  
+test_sd = sqrt(  (sigma1^2/n1)  +  ( sigma2^2/n2) ) 
+
+degf = test_sd^4 / (  ( (sigma1^2/n1)^2/(n1 - 1) ) +  ( (sigma2^2/n2)^2/(n2- 1) ) )
+
+t_critical = qt(0.05 /2, degf ,lower.tail = FALSE)
+
+t_observed = test_mean_diff*0.13 / test_sd
+  
+xpnorm(c(test_mean_diff - t_critical*test_sd, test_mean_diff - t_observed*test_sd,test_mean_diff + t_observed*test_sd, test_mean_diff + t_critical*test_sd), mean=test_mean_diff, sd=test_sd)
+
+plotttest(t=t_observed, df = degf)
+
 ```
 
-```{r}
-
-day_of_week <- as.factor(dataset_filtered$DAY)
-
-delay <- dataset_filtered$ARR_DEL15
-
-tally_data <- tally(delay ~ day_of_week)
-
-tally_data
-
-labels <- paste(round(tally(delay ~ day_of_week, format='perc'), digits=2),'%',sep='')
-
-delay_barplot <- barplot(tally_data, beside=T,legend.text=c("No Delay","Delay"),ylim=c(0,160000))
-grid(nx = NA, ny = NULL, lwd = 1, lty = 1, col = "gray")
-barplot(tally_data, beside=T,legend.text=c("No Delay","Delay"),ylim=c(0,160000),add=TRUE)
-text(delay_barplot, tally_data + 8000, labels = labels)
-
-
-chisq.test(tally(delay ~ day_of_week))
-
-```
-
 
 ```{r}
-
 
 # plot_data <- showStats(weekend_delays, weekday_delays, "Proportion of delays over weekdays", "Proportion of delays over weekends", 8 ,'proportion')
 # 
@@ -330,22 +363,27 @@ chisq.test(tally(delay ~ day_of_week))
 
 printSummary(weekday_delay_proportion)
 
-hist(weekday_delay_proportion, prob = TRUE, breaks = 10, main="Proportion of delays over weekdays")
+hist(weekday_delay_proportion, prob = TRUE, breaks = 6, main="Proportion of delays over weekdays")
 lines(density(weekday_delay_proportion), col = 4, lwd = 2)
 
-suppressWarnings({
-  xqqmath(weekday_delay_proportion)
-})
-
+# suppressWarnings({
+#   xqqmath(weekday_delay_proportion)
+# })
 
 printSummary(weekend_delay_proportion)
 
-hist(weekend_delay_proportion, prob = TRUE, breaks = 12, main="Proportion of delays over weekends", ylim=(c(0,5)))
+hist(weekend_delay_proportion, prob = TRUE, breaks = 6, main="Proportion of delays over weekends", ylim=(c(0,6)))
 lines(density(weekend_delay_proportion), col = 4, lwd = 2)
 
-suppressWarnings({
-  xqqmath(weekend_delay_proportion)
-})
+# suppressWarnings({
+#   xqqmath(weekend_delay_proportion)
+# })
+
+boxplot(list(WeekdayDelays = weekday_delay_proportion, WeekdendDelays = weekend_delay_proportion),
+main = "Delays over weekdays and weekend", 
+xlab = "Proportion of delays",
+col = c("orange", "lightgreen"), names = c("Weekday Delays", "Weekdend Delays"),
+    horizontal = TRUE)
 
 WD_len = length(weekday_delay_proportion)
 
@@ -378,9 +416,58 @@ plot_data %>%
     theme(axis.text.x = element_text(angle = 45, vjust=0.5))
 
 ```
+
+
+
 ```{r}
 
-## TODO: The proportion test. https://sites.calvin.edu/scofield/courses/m145/materials/sld/PropTTest.html
+day_of_week <- as.factor(dataset_filtered$DAY)
+
+delay <- dataset_filtered$ARR_DEL15
+
+delay_weekend_data = tally(delay ~ day_of_week, margin=TRUE)
+
+delay_weekend_data
+
+tally_data = tally(delay ~ day_of_week)
+
+labels <- paste(round(tally(delay ~ day_of_week, format='perc'), digits=2),'%',sep='')
+
+delay_barplot <- barplot(tally_data, beside=T,legend.text=c("No Delay","Delay"),ylim=c(0,140000))
+grid(nx = NA, ny = NULL, lwd = 1, lty = 1, col = "gray")
+barplot(tally_data, beside=T,legend.text=c("No Delay","Delay"),ylim=c(0,140000),add=TRUE)
+text(delay_barplot, tally_data + 8000, labels = labels)
+
+chisq.test(tally(delay ~ day_of_week),correct = FALSE)
+
+#prop.test(x=delay_weekend_data[c(2,5)], n=delay_weekend_data[c(3,6)], alternative='greater', correct=FALSE)
+```
+```{r}
+
+proportions = tally(delay ~ day_of_week)
+
+p1 = proportions[c(2),][[1]]
+p2 = proportions[c(2),][[2]]
+n1 = delay_weekend_data[c(3,6)][1]
+n2 = delay_weekend_data[c(3,6)][2]
+
+# cat(paste(p1,p2, n1, n2 ,sep=' '))
+
+prop.test(x=c(p1, p2), n=c(n1, n2), alternative='two', correct=FALSE)
+
+test_prop <- p1/n1 - p2/n2
+
+p_pooled <- (p1 + p2)/(n1 + n2)
+
+test_sd <- sqrt( p_pooled*(1 - p_pooled)*( 1/n1  +  1/n2 ) )
+
+Z_observed <- test_prop / test_sd
+
+Z_critical <- qnorm( 0.05 /2)
+
+xpnorm(c(test_prop - Z_critical*test_sd, test_prop - Z_observed*test_sd, test_prop + Z_observed*test_sd, test_prop + Z_critical*test_sd), mean=test_prop, sd=test_sd)
+
+
 ```
 
 
